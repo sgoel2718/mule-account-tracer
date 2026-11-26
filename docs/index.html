@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mule Account Tracer: follow scam money before it's cashed out</title>
+<meta name="description" content="Real-time tracing of digital-arrest and UPI scam money through layered mule accounts. Java, graphs, union-find, min-cut.">
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121820; --panel2:#18202b; --line:#243041; --ink:#e7edf5; --mute:#8a9aae; --dim:#5d6b7d;
+    --green:#3ddc97; --red:#ff5a5f; --amber:#ffb547; --blue:#5aa9ff; --violet:#b48cff;
+    --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5}
+  a{color:var(--blue)}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+  header{border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0f151d,#0b0f14)}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:14px 0;font-size:14px;color:var(--mute)}
+  .top b{color:var(--ink);letter-spacing:.04em}
+  .top .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:8px;box-shadow:0 0 10px var(--red);animation:pulse 1.6s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  .hero{padding:44px 0 36px;display:grid;grid-template-columns:1.25fr 1fr;gap:40px;align-items:end}
+  h1{font-size:46px;line-height:1.05;margin:0 0 14px;letter-spacing:-.02em}
+  h1 em{font-style:normal;color:var(--green)}
+  .lede{color:var(--mute);font-size:17px;max-width:620px;margin:0}
+  .story{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--red);border-radius:10px;padding:16px 18px;font-size:14px;color:#c4cfdc}
+  .story h4{margin:0 0 6px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .chip{font:12px var(--mono);color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+  .chip b{color:var(--ink);font-weight:600}
+  section{padding:30px 0}
+  h2{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 14px;font-weight:600}
+  .control{display:flex;flex-wrap:wrap;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .control .lbl{font-size:14px;color:var(--mute)}
+  .seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{background:transparent;color:var(--mute);border:0;border-right:1px solid var(--line);padding:9px 14px;font:600 13px var(--mono);cursor:pointer}
+  .seg button:last-child{border-right:0}
+  .seg button:hover{background:var(--panel2);color:var(--ink)}
+  .seg button.on{background:var(--ink);color:var(--bg)}
+  .btn{background:var(--green);color:#06130d;border:0;border-radius:9px;padding:9px 14px;font:700 13px var(--sans);cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:default}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:14px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .stat .k{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+  .stat .v{font:700 26px var(--mono);margin-top:4px;letter-spacing:-.02em}
+  .stat .s{font-size:12px;color:var(--dim);margin-top:2px}
+  .g{color:var(--green)} .r{color:var(--red)} .a{color:var(--amber)}
+  .bar{height:6px;border-radius:4px;background:var(--red);margin-top:10px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--green);transition:width .6s}
+  .graphbox{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-top:14px;overflow:hidden}
+  .graphbox svg{display:block;width:100%;height:auto}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--mute)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .tip{position:absolute;pointer-events:none;background:#0a0e13f2;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;max-width:320px;opacity:0;transition:opacity .12s;z-index:5}
+  .tip h5{margin:0 0 4px;font:700 13px var(--mono)}
+  .tip .row{display:flex;justify-content:space-between;gap:14px;color:var(--mute)}
+  .tip .row b{color:var(--ink);font-family:var(--mono)}
+  .tip ul{margin:6px 0 0;padding-left:16px;color:#c4cfdc}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h3{margin:0 0 10px;font-size:15px}
+  .card p{color:var(--mute);font-size:14px;margin:0 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px;border-bottom:1px solid #1a2230;vertical-align:top}
+  td.m{font-family:var(--mono);white-space:nowrap}
+  td.why{color:var(--mute);font-size:12px;min-width:260px}
+  .pill{font:700 11px var(--mono);padding:2px 8px;border-radius:999px;display:inline-block}
+  .FREEZE{background:#ff5a5f22;color:var(--red);border:1px solid #ff5a5f55}
+  .LIEN{background:#5aa9ff1f;color:var(--blue);border:1px solid #5aa9ff55}
+  .BLOCK{background:#b48cff22;color:var(--violet);border:1px solid #b48cff55}
+  .score{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono)}
+  .score i{display:inline-block;height:6px;border-radius:3px}
+  .tablewrap{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  .tablewrap thead th{position:sticky;top:0;background:var(--panel)}
+  .ring{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+  .ring b{font-family:var(--mono)}
+  .tag{font:11px var(--mono);color:var(--mute);background:var(--panel2);border-radius:6px;padding:2px 6px;margin:2px 4px 2px 0;display:inline-block}
+  .tag.d{color:var(--amber)}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:6px 14px;font-size:14px}
+  .kv span{color:var(--mute)} .kv b{font-family:var(--mono)}
+  .algo{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .algo .card h3{font-size:14px}
+  .algo .cx{font:12px var(--mono);color:var(--green);margin-top:6px}
+  .pipe{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 18px}
+  .pipe div{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font:12px var(--mono)}
+  .pipe s{text-decoration:none;color:var(--dim)}
+  pre{background:#070a0e;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;font:13px var(--mono);color:#c9d6e3}
+  footer{border-top:1px solid var(--line);color:var(--dim);font-size:13px;padding:24px 0 40px}
+  .note{font-size:12px;color:var(--dim);margin-top:8px}
+  @media (max-width:900px){.hero,.cols{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.algo{grid-template-columns:1fr}h1{font-size:34px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top"><div><span class="dot"></span><b>MULE ACCOUNT TRACER</b></div>
+      <a href="https://github.com/sgoel2718/mule-account-tracer">GitHub ↗</a></div>
+    <div class="hero">
+      <div>
+        <h1>Follow the scam money.<br><em>Freeze it before it's cashed&nbsp;out.</em></h1>
+        <p class="lede">A Java engine that takes a fraud complaint, traces the victim's money hop by hop through layered mule accounts in time order, and tells banks exactly which accounts to freeze first.</p>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="story">
+        <h4>Scenario · "Digital arrest"</h4>
+        A retired professor in Chennai gets a video call from a fake "CBI officer". He's told his Aadhaar is linked to money laundering and he must move his savings to an "RBI verification account". Over 52 minutes he makes <b>4 transfers totalling ₹18.5 lakh</b>. The gang splits the money across 21 mule accounts and cashes it out through ATMs in Jamtara, Nuh and Bharatpur and USDT P2P desks.
+        <div class="note">Synthetic data generated by the Java simulator (seed 1930). Real banking data is never used.</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <h2>1 · When does the complaint reach the bank?</h2>
+    <div class="control">
+      <span class="lbl">Minutes after the victim's last transfer:</span>
+      <div class="seg" id="delays"></div>
+      <button class="btn" id="replay">▶ Replay money trail</button>
+      <span class="lbl" id="clock"></span>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">Stolen</div><div class="v" id="sStolen">-</div><div class="s">4 reported UTRs</div></div>
+      <div class="stat"><div class="k">Still freezable</div><div class="v g" id="sFreeze">-</div><div class="s" id="sFreezeS"></div>
+        <div class="bar"><i id="sBar"></i></div></div>
+      <div class="stat"><div class="k">Already cashed out</div><div class="v r" id="sCash">-</div><div class="s">ATM + crypto P2P</div></div>
+      <div class="stat"><div class="k">Money trail</div><div class="v" id="sTrail">-</div><div class="s" id="sTrailS"></div></div>
+      <div class="stat"><div class="k">Engine time</div><div class="v a" id="sTime">-</div><div class="s" id="sTimeS"></div></div>
+    </div>
+
+    <div class="graphbox" id="gbox">
+      <svg id="graph" viewBox="0 0 1200 620" role="img" aria-label="Money flow graph"></svg>
+      <div class="tip" id="tip"></div>
+      <div class="legend">
+        <span><i class="sw" style="background:#e7edf5"></i>Victim</span>
+        <span><i class="sw" style="background:var(--red)"></i>Likely mule (score ≥ 70)</span>
+        <span><i class="sw" style="background:var(--amber)"></i>Review</span>
+        <span><i class="sw" style="background:var(--blue)"></i>Likely innocent (lien only)</span>
+        <span><i class="sw" style="background:#5b1f22;border:1px solid var(--red)"></i>Cash-out point</span>
+        <span><i class="sw" style="background:transparent;border:2px dashed var(--violet)"></i>Chokepoint (min vertex cut)</span>
+        <span><i class="sw" style="background:transparent;border:2px solid var(--green)"></i>Green ring = money still freezable</span>
+        <span style="margin-left:auto">Columns = layers (hops) from the victim · edge width = rupees moved</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2 · Every minute counts</h2>
+    <div class="cols">
+      <div class="card">
+        <h3>Recoverable share vs. complaint delay</h3>
+        <svg id="curve" viewBox="0 0 560 240" style="width:100%;height:auto"></svg>
+        <p id="curveNote"></p>
+      </div>
+      <div class="card">
+        <h3>Accuracy against ground truth</h3>
+        <p>The simulator knows which accounts really are mules, so we can grade the engine's decisions.</p>
+        <div class="kv" id="acc" style="margin-bottom:12px"></div>
+        <p class="note">Hard actions = FREEZE + BLOCK. Accounts that are likely innocent only get a LIEN on the exact tainted amount, so a shopkeeper paid ₹1,200 by a mule can keep using the rest of his account.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3 · Prioritised freeze list sent to banks</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>Account</th><th>Bank · City</th><th>Hop</th><th>Held now</th><th>Score</th><th>Action</th><th>Evidence</th></tr></thead>
+        <tbody id="orders"></tbody>
+      </table>
+    </div>
+    <p class="note">Ordered by a max-heap on <code>held × risk</code>, so the fraud desk acts first where a freeze recovers the most money with the least chance of hitting an innocent account.</p>
+  </section>
+
+  <section>
+    <h2>4 · Mule rings &amp; pre-emptive watchlist</h2>
+    <div class="cols">
+      <div class="card"><h3>Rings found via shared devices / networks (union-find)</h3><div id="rings"></div></div>
+      <div class="card"><h3>Chokepoints (minimum vertex cut, Dinic max-flow)</h3>
+        <p>The fewest accounts that every observed route from the victim to a cash-out point passed through. Blocking them shuts this gang's pipeline, so the next victim's money has nowhere to go.</p>
+        <div id="cut"></div>
+        <h3 style="margin-top:18px">Watchlist: dormant ring accounts</h3>
+        <p>These accounts haven't touched this victim's money, but they log in from the same phones as the mules. Flag them before the <i>next</i> victim pays them.</p>
+        <div id="watch"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>5 · How it works</h2>
+    <div class="pipe">
+      <div>Complaint (UTRs)</div><s>→</s><div>Time-respecting taint trace</div><s>→</s><div>Mule rings</div><s>→</s><div>Risk scores + PageRank</div><s>→</s><div>Min vertex cut</div><s>→</s><div>Freeze list (max-heap)</div>
+    </div>
+    <div class="algo">
+      <div class="card"><h3>Temporal graph</h3><p>Each account's debits stay sorted by time. Money that arrived at 10:04 can only leave on a debit after 10:04, found by binary search.</p><div class="cx">insert O(1) amortised · lookup O(log d)</div></div>
+      <div class="card"><h3>Taint propagation</h3><p>An event-driven k-way merge: a min-heap holds one cursor per tainted account. A debit carries min(amount, tainted balance) onward. Money is conserved exactly.</p><div class="cx">O((S + E′) log K)</div></div>
+      <div class="card"><h3>Mule rings</h3><p>Incremental union-find over device fingerprints and IP hashes. Member lists merge on union, so a query touches only the rings that were hit.</p><div class="cx">O(α(n)) per login event</div></div>
+      <div class="card"><h3>Risk score</h3><p>7 explainable signals: concentration, pass-through, speed, ring, account age, PageRank hub, fan-out. Behaviour that hasn't been observed yet is excluded, not counted as innocent.</p><div class="cx">PageRank O(iter·(V+E))</div></div>
+      <div class="card"><h3>Chokepoints</h3><p>Node-split flow network (capacity 1 per mule) solved with Dinic. By Menger's theorem, the min cut equals the number of vertex-disjoint cash-out routes.</p><div class="cx">O(E·√V) on unit capacities</div></div>
+      <div class="card"><h3>REST API</h3><p>JDK <code>HttpServer</code>, no frameworks: <code>/api/investigate?utr=…&amp;reportTime=…</code> returns the trail, freeze list, rings and cut as JSON.</p><div class="cx" id="benchCx">p50 0.26 ms on 2M txns</div></div>
+    </div>
+    <pre>git clone https://github.com/sgoel2718/mule-account-tracer && cd mule-account-tracer
+mvn -q package
+java -jar target/mule-account-tracer-1.0.0.jar demo 30     # freeze list in the terminal
+java -jar target/mule-account-tracer-1.0.0.jar serve 8080  # REST API
+java -jar target/mule-account-tracer-1.0.0.jar bench       # 200K accounts, 2M transactions</pre>
+    <p class="note">Every number on this page was computed by the Java engine (<code>App export</code> → <code>docs/data/scenario.json</code>). The page only draws it.</p>
+  </section>
+</main>
+
+<footer><div class="wrap">Built by <a href="https://github.com/sgoel2718">Shubham</a> · Java 17 · no runtime dependencies · synthetic data only. If you have been scammed in India, call <b>1930</b> or report at cybercrime.gov.in as fast as you can. As this demo shows, the first hour matters most.</div></footer>
+
+<script>
+(async function(){
+  const NS = "http://www.w3.org/2000/svg";
+  const $ = id => document.getElementById(id);
+  let data;
+  try { data = await (await fetch("data/scenario.json")).json(); }
+  catch(e){ document.querySelector("main").innerHTML = "<p style='padding:40px'>Could not load data/scenario.json. Serve this folder over HTTP (e.g. GitHub Pages or <code>python -m http.server</code>).</p>"; return; }
+
+  const runs = data.runs, acc = data.accounts, meta = data.meta;
+  const inr = p => "₹" + Math.round(p/100).toLocaleString("en-IN");
+  const lakh = p => { const r = p/100; return r >= 100000 ? "₹" + (r/100000).toFixed(2) + " L" : "₹" + Math.round(r).toLocaleString("en-IN"); };
+  const fmtT = ts => new Date(ts*1000).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata",hour:"2-digit",minute:"2-digit",hour12:false});
+  const label = d => d === 0 ? "0" : d < 60 ? d + "m" : (d/60) + "h";
+
+  $("chips").innerHTML = [
+    ["Java", "17"], ["runtime deps", "0"], ["graph", meta.graphTransactions.toLocaleString("en-IN") + " txns"],
+    ["tests", "31 JUnit"], ["trace p50", "35 µs @ 2M txns"]
+  ].map(([k,v]) => `<span class="chip">${k} <b>${v}</b></span>`).join("");
+
+  let cur = 2; // 30 min default
+  const seg = $("delays");
+  runs.forEach((r,i) => {
+    const b = document.createElement("button");
+    b.textContent = label(r.delayMinutes);
+    b.onclick = () => { cur = i; render(); };
+    seg.appendChild(b);
+  });
+
+  function colorFor(id, run){
+    const t = acc[id] && acc[id].truth;
+    if (t === "victim") return "#e7edf5";
+    if (id.startsWith("CASH:")) return "#5b1f22";
+    const a = run.accounts[id];
+    if (!a) return "#5d6b7d";
+    return a.verdict === "LIKELY_MULE" ? "#ff5a5f" : a.verdict === "REVIEW" ? "#ffb547" : "#5aa9ff";
+  }
+
+  // ---------- graph ----------
+  let layout = null;
+  function buildLayout(run){
+    const hop = {}; hop[meta.victim] = 0;
+    Object.entries(run.accounts).forEach(([id,a]) => hop[id] = a.hop);
+    const sinks = new Set();
+    run.edges.forEach(e => { if (e.to.startsWith("CASH:")) sinks.add(e.to); });
+    const maxHop = Math.max(1, ...Object.values(hop));
+    const sinkCol = maxHop + 1;
+    sinks.forEach(s => hop[s] = sinkCol);
+    const cols = Array.from({length: sinkCol+1}, () => []);
+    Object.entries(hop).forEach(([id,h]) => cols[h].push(id));
+    const W = 1200, H = 620, padX = 70, padY = 34;
+    const colX = c => padX + c * (W - 2*padX) / sinkCol;
+    const pos = {};
+    const preds = {};
+    run.edges.forEach(e => (preds[e.to] = preds[e.to] || []).push(e.from));
+    cols.forEach((list, c) => {
+      if (c > 0) { // barycentre ordering reduces crossings
+        const ys = {}; list.forEach(id => { const ps=(preds[id]||[]).filter(p=>pos[p]); ys[id] = ps.length ? ps.reduce((s,p)=>s+pos[p].y,0)/ps.length : H/2; });
+        list.sort((a,b) => ys[a]-ys[b]);
+      }
+      const n = list.length, step = (H - 2*padY) / Math.max(1, n);
+      list.forEach((id,i) => pos[id] = {x: colX(c), y: n === 1 ? H/2 : padY + step*(i+0.5)});
+    });
+    const maxRecv = Math.max(...Object.values(run.accounts).map(a => a.received));
+    const sinkIn = {}; run.edges.forEach(e => { if (sinks.has(e.to)) sinkIn[e.to] = (sinkIn[e.to]||0) + e.tainted; });
+    const radius = id => {
+      if (id === meta.victim) return 14;
+      const v = id.startsWith("CASH:") ? sinkIn[id] : run.accounts[id].received;
+      return 4 + 13 * Math.sqrt(v / maxRecv);
+    };
+    return {pos, radius, sinkCol, colX, H, W};
+  }
+
+  function render(){
+    const run = runs[cur];
+    [...seg.children].forEach((b,i) => b.classList.toggle("on", i === cur));
+    const s = run.summary;
+    $("sStolen").textContent = lakh(s.fraudTotal);
+    $("sFreeze").textContent = lakh(s.freezable);
+    $("sFreezeS").textContent = (s.recoveryRate*100).toFixed(1) + "% of stolen money";
+    $("sBar").style.width = (s.recoveryRate*100) + "%";
+    $("sCash").textContent = lakh(s.cashedOut);
+    $("sTrail").textContent = s.tracedAccounts + " a/c";
+    $("sTrailS").textContent = s.taintedTransactions + " tainted transfers · " + s.maxHop + " layers · " + s.eventsProcessed + " heap events";
+    $("sTime").textContent = "0.26 ms";
+    $("sTimeS").textContent = "p50 full investigation, 2M-txn graph";
+    $("clock").textContent = "Complaint received at " + fmtT(s.reportTime) + " IST";
+    drawGraph(run, Infinity);
+    drawCurve();
+    drawAccuracy(run);
+    drawOrders(run);
+    drawRings(run);
+  }
+
+  function drawGraph(run, upTo){
+    const svg = $("graph"); svg.innerHTML = "";
+    layout = buildLayout(run);
+    const {pos, radius, sinkCol, colX, H} = layout;
+    // column headers
+    for (let c = 0; c <= sinkCol; c++){
+      const t = document.createElementNS(NS,"text");
+      t.setAttribute("x", colX(c)); t.setAttribute("y", 16); t.setAttribute("text-anchor","middle");
+      t.setAttribute("fill","#5d6b7d"); t.setAttribute("font-size","11"); t.setAttribute("font-family","ui-monospace,monospace");
+      t.textContent = c === 0 ? "VICTIM" : c === sinkCol ? "CASH-OUT" : "LAYER " + c;
+      svg.appendChild(t);
+    }
+    const maxT = Math.max(...run.edges.map(e => e.tainted));
+    const g = document.createElementNS(NS,"g"); svg.appendChild(g);
+    run.edges.forEach(e => {
+      if (e.ts > upTo || !pos[e.from] || !pos[e.to]) return;
+      const a = pos[e.from], b = pos[e.to];
+      const p = document.createElementNS(NS,"path");
+      const mx = (a.x + b.x)/2;
+      p.setAttribute("d", `M${a.x},${a.y} C${mx},${a.y} ${mx},${b.y} ${b.x},${b.y}`);
+      p.setAttribute("fill","none");
+      const cash = e.to.startsWith("CASH:");
+      p.setAttribute("stroke", e.hop === 1 ? "#e7edf5" : cash ? "#ff5a5f" : "#8a9aae");
+      p.setAttribute("stroke-opacity", cash ? .55 : .38);
+      p.setAttribute("stroke-width", Math.max(.8, 9 * Math.sqrt(e.tainted / maxT)));
+      g.appendChild(p);
+    });
+    const choke = new Set(run.chokepoints.accounts);
+    Object.keys(pos).forEach(id => {
+      if (upTo !== Infinity && id !== meta.victim) {
+        const first = id.startsWith("CASH:") ? Math.min(...run.edges.filter(e=>e.to===id).map(e=>e.ts)) : run.accounts[id].firstTaintedAt;
+        if (first > upTo) return;
+      }
+      const {x,y} = pos[id], r = radius(id);
+      const c = document.createElementNS(NS,"circle");
+      c.setAttribute("cx",x); c.setAttribute("cy",y); c.setAttribute("r",r);
+      c.setAttribute("fill", colorFor(id, run));
+      if (id.startsWith("CASH:")) { c.setAttribute("stroke","#ff5a5f"); c.setAttribute("stroke-width","1.2"); }
+      svg.appendChild(c);
+      const a = run.accounts[id];
+      if (a && a.held > 0 && upTo === Infinity){
+        const ring = document.createElementNS(NS,"circle");
+        ring.setAttribute("cx",x); ring.setAttribute("cy",y); ring.setAttribute("r", r + 3.5);
+        ring.setAttribute("fill","none"); ring.setAttribute("stroke","#3ddc97");
+        ring.setAttribute("stroke-width", Math.max(1.2, 3.5 * a.held / a.received));
+        svg.appendChild(ring);
+      }
+      if (choke.has(id)){
+        const k = document.createElementNS(NS,"circle");
+        k.setAttribute("cx",x); k.setAttribute("cy",y); k.setAttribute("r", r + 8);
+        k.setAttribute("fill","none"); k.setAttribute("stroke","#b48cff"); k.setAttribute("stroke-width","2"); k.setAttribute("stroke-dasharray","4 3");
+        svg.appendChild(k);
+      }
+      const hit = document.createElementNS(NS,"circle");
+      hit.setAttribute("cx",x); hit.setAttribute("cy",y); hit.setAttribute("r", Math.max(r+8, 12));
+      hit.setAttribute("fill","transparent"); hit.style.cursor = "pointer";
+      hit.addEventListener("mousemove", ev => showTip(ev, id, run));
+      hit.addEventListener("mouseleave", () => $("tip").style.opacity = 0);
+      svg.appendChild(hit);
+    });
+  }
+
+  function showTip(ev, id, run){
+    const tip = $("tip"), box = $("gbox").getBoundingClientRect();
+    const a = run.accounts[id], k = acc[id] || {};
+    let h = `<h5>${id}</h5>`;
+    if (id === meta.victim) h += `<div class="row">Victim · ${k.bank} ${k.city}<b>${lakh(run.summary.fraudTotal)} sent</b></div>`;
+    else if (id.startsWith("CASH:")) {
+      const tot = run.edges.filter(e => e.to === id).reduce((s,e)=>s+e.tainted,0);
+      h += `<div class="row">Cash-out point<b class="r">${inr(tot)} gone</b></div>`;
+    } else {
+      h += `<div class="row">${k.bank} · ${k.city} · ${k.ageDays} days old</div>`;
+      h += `<div class="row">Received<b>${inr(a.received)}</b></div><div class="row">Held now (freezable)<b class="g">${inr(a.held)}</b></div>`;
+      if (a.cashedOut) h += `<div class="row">Withdrew<b class="r">${inr(a.cashedOut)}</b></div>`;
+      h += `<div class="row">Layer · first tainted<b>${a.hop} · ${fmtT(a.firstTaintedAt)}</b></div>`;
+      h += `<div class="row">Risk score<b>${a.score} · ${a.verdict.replace("_"," ")}</b></div>`;
+      h += `<ul>${a.reasons.map(r=>`<li>${r}</li>`).join("")}</ul>`;
+    }
+    tip.innerHTML = h;
+    let x = ev.clientX - box.left + 14, y = ev.clientY - box.top + 14;
+    if (x > box.width - 330) x -= 350;
+    if (y > box.height - 200) y -= 200;
+    tip.style.left = x + "px"; tip.style.top = y + "px"; tip.style.opacity = 1;
+  }
+
+  $("replay").onclick = () => {
+    const run = runs[cur], btn = $("replay");
+    const t0 = Math.min(...run.edges.map(e=>e.ts)), t1 = run.summary.reportTime;
+    btn.disabled = true;
+    const dur = 6000, start = performance.now();
+    function step(now){
+      const f = Math.min(1, (now - start)/dur), t = t0 + (t1 - t0) * f;
+      drawGraph(run, t);
+      $("clock").textContent = "Replaying… " + fmtT(t) + " IST";
+      if (f < 1) requestAnimationFrame(step); else { btn.disabled = false; render(); }
+    }
+    requestAnimationFrame(step);
+  };
+
+  // ---------- curve ----------
+  function drawCurve(){
+    const svg = $("curve"); svg.innerHTML = "";
+    const W = 560, H = 240, L = 44, R = 16, T = 14, B = 34;
+    const xs = runs.map((_,i) => L + i * (W-L-R)/(runs.length-1));
+    const y = v => T + (1 - v) * (H-T-B);
+    const add = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v)); if (text!=null) e.textContent = text; svg.appendChild(e); return e; };
+    [0, .25, .5, .75, 1].forEach(v => {
+      add("line",{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:"#243041"});
+      add("text",{x:L-8,y:y(v)+4,"text-anchor":"end",fill:"#5d6b7d","font-size":11,"font-family":"ui-monospace,monospace"}, (v*100)+"%");
+    });
+    const pts = runs.map((r,i) => [xs[i], y(r.summary.recoveryRate)]);
+    add("path",{d:"M"+pts.map(p=>p.join(",")).join(" L")+` L${xs[xs.length-1]},${y(0)} L${xs[0]},${y(0)} Z`, fill:"#3ddc9714"});
+    add("path",{d:"M"+pts.map(p=>p.join(",")).join(" L"), fill:"none", stroke:"#3ddc97","stroke-width":2.5});
+    runs.forEach((r,i) => {
+      add("text",{x:xs[i],y:H-12,"text-anchor":"middle",fill:"#8a9aae","font-size":11,"font-family":"ui-monospace,monospace"}, label(r.delayMinutes));
+      const c = add("circle",{cx:pts[i][0],cy:pts[i][1],r:i===cur?7:4,fill:i===cur?"#e7edf5":"#3ddc97",stroke:"#0b0f14","stroke-width":2});
+      c.style.cursor = "pointer"; c.onclick = () => { cur = i; render(); };
+      if (i === cur) add("text",{x:pts[i][0],y:pts[i][1]-12,"text-anchor":"middle",fill:"#e7edf5","font-size":12,"font-weight":700,"font-family":"ui-monospace,monospace"}, (r.summary.recoveryRate*100).toFixed(0)+"%");
+    });
+    const r0 = runs[0].summary, r60 = runs.find(r=>r.delayMinutes===60).summary, r240 = runs.find(r=>r.delayMinutes===240).summary;
+    $("curveNote").innerHTML = `Reported immediately, <b class="g">${lakh(r0.freezable)}</b> can still be frozen. Waiting one hour loses <b class="r">${lakh(r0.freezable - r60.freezable)}</b> more, and after 4 hours only <b>${(r240.recoveryRate*100).toFixed(0)}%</b> is left, mostly mule commissions the gang never withdrew.`;
+  }
+
+  function drawAccuracy(run){
+    const a = run.accuracy;
+    $("acc").innerHTML = [
+      ["Mule accounts in the scam", a.muleAccountsTotal],
+      ["Mules already reached by the money (and traced)", a.muleAccountsTraced],
+      ["Hard actions (freeze / block)", a.hardActions],
+      ["Precision of hard actions", (a.precision*100).toFixed(0) + "%"],
+      ["Innocent accounts frozen", a.innocentFrozen],
+      ["Innocent accounts given a lien only", a.innocentLienOnly],
+      ["Dormant mules put on the watchlist", a.dormantMulesWatchlisted + " / " + a.dormantMulesTotal],
+    ].map(([k,v]) => `<span>${k}</span><b>${v}</b>`).join("");
+  }
+
+  function drawOrders(run){
+    const choke = new Set(run.chokepoints.accounts);
+    $("orders").innerHTML = run.freezeOrders.map(o => {
+      const col = o.score >= 70 ? "#ff5a5f" : o.score >= 40 ? "#ffb547" : "#5aa9ff";
+      return `<tr><td class="m">${o.rank}</td><td class="m">${o.account}${choke.has(o.account)?' <span class="pill BLOCK" title="chokepoint">CUT</span>':''}</td>
+        <td>${o.bank} · ${o.city}</td><td class="m">${o.hop}</td><td class="m g">${inr(o.held)}</td>
+        <td><span class="score"><i style="width:${o.score*0.6}px;background:${col}"></i>${o.score}</span></td>
+        <td><span class="pill ${o.action}">${o.action}</span></td><td class="why">${o.reasons.join(" · ")}</td></tr>`;
+    }).join("");
+  }
+
+  function drawRings(run){
+    $("rings").innerHTML = run.rings.map(r => `<div class="ring"><b>${r.id}</b> · ${r.members.length} accounts · ${r.tainted.length} used in this scam
+      <div style="margin:6px 0">${r.sharedSignals.map(s=>`<span class="tag">${s}</span>`).join("")}</div>
+      <div>${r.tainted.map(m=>`<span class="tag">${m}</span>`).join("")}${r.dormant.map(m=>`<span class="tag d" title="dormant">${m} · dormant</span>`).join("")}</div></div>`).join("")
+      || "<p>No rings touched yet.</p>";
+    $("cut").innerHTML = run.chokepoints.accounts.length
+      ? run.chokepoints.accounts.map(m=>`<span class="tag" style="color:#b48cff">${m}</span>`).join("") + `<p class="note">${run.chokepoints.disjointCashOutRoutes} vertex-disjoint routes to ${run.chokepoints.cashOutPoints} cash-out points.</p>`
+      : "<p>No cash-out yet, so there's nothing to cut. Freeze the holders.</p>";
+    $("watch").innerHTML = run.watchlist.map(m=>`<span class="tag d">${m}</span>`).join("") || "<p>None.</p>";
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
